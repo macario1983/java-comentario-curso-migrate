@@ -17,8 +17,10 @@ import java.sql.*;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
+import java.util.stream.Collectors;
 
 public class ComentarioCursoConverterService {
 
@@ -87,6 +89,38 @@ public class ComentarioCursoConverterService {
         }
     }
 
+    private List<Integer> loadCursosId() {
+
+        Connection connection = null;
+
+        try {
+            connection = getConnection();
+            Statement statement = connection.createStatement();
+            ResultSet resultSet = statement.executeQuery("SELECT DISTINCT id FROM curso ORDER BY id;");
+
+            List<Integer> cursosId = new ArrayList<>();
+
+            while (resultSet.next()) {
+                cursosId.add(resultSet.getInt(1));
+            }
+
+            return cursosId;
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        } finally {
+            if (connection != null) {
+                try {
+                    connection.close();
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+
+        return Collections.emptyList();
+    }
+
     private void convertResponsesToComentariosCurso(List<Response> responses) {
 
         System.out.println("Quantidade de comentarios: " + responses
@@ -97,7 +131,27 @@ public class ComentarioCursoConverterService {
         List<ComentarioCurso> comentariosCurso = new ArrayList<>(responses.size());
         responses.stream().forEach(response -> comentariosCurso.addAll(ComentarioCursoMapper.INSTANCE.responseToComentariosCurso(response)));
 
-        saveComentariosCurso(comentariosCurso);
+        List<Integer> cursosId = loadCursosId();
+
+        List<Integer> cursosIdNotPresentInComentariosCurso = comentariosCurso
+                .stream()
+                .filter(comentarioCurso -> !cursosId.contains(comentarioCurso.getCursoId()))
+                .map(comentarioCurso -> comentarioCurso.getCursoId())
+                .distinct()
+                .collect(Collectors.toList());
+
+        List<ComentarioCurso> comentariosCursoPresent = comentariosCurso.stream().filter(comentarioCurso -> cursosId.contains(comentarioCurso.getCursoId())).collect(Collectors.toList());
+
+        System.out.println("*****************************************************************************************");
+        System.out.println("Cursos não presentes...");
+
+        cursosIdNotPresentInComentariosCurso.forEach(cursoId -> {
+            System.out.println("Curso - " + cursoId);
+        });
+
+        System.out.println("*****************************************************************************************");
+
+        saveComentariosCurso(comentariosCursoPresent);
     }
 
     private void saveComentariosCurso(List<ComentarioCurso> comentariosCurso) {
@@ -122,23 +176,9 @@ public class ComentarioCursoConverterService {
 
             for (ComentarioCurso comentarioCurso : comentariosCurso) {
 
-                if (Utils.objectIsNotNull(comentarioCurso.getDescricao())) {
-                    pstmt.setString(1, comentarioCurso.getDescricao());
-                } else {
-                    pstmt.setNull(1, Types.VARCHAR);
-                }
-
-                if (Utils.objectIsNotNull(comentarioCurso.getResposta())) {
-                    pstmt.setString(2, comentarioCurso.getResposta());
-                } else {
-                    pstmt.setNull(2, Types.VARCHAR);
-                }
-
-                if (Utils.objectIsNotNull(comentarioCurso.getStatus())) {
-                    pstmt.setString(3, comentarioCurso.getStatus());
-                } else {
-                    pstmt.setNull(3, Types.VARCHAR);
-                }
+                pstmt.setString(1, comentarioCurso.getDescricao());
+                pstmt.setString(2, comentarioCurso.getResposta());
+                pstmt.setString(3, comentarioCurso.getStatus());
 
                 if (Utils.objectIsNotNull(comentarioCurso.getTipoComentario())) {
                     pstmt.setString(4, comentarioCurso.getTipoComentario());
@@ -147,12 +187,7 @@ public class ComentarioCursoConverterService {
                 }
 
                 pstmt.setShort(5, (short) 1);
-
-                if (Utils.objectIsNotNull(comentarioCurso.getDataComentario())) {
-                    pstmt.setTimestamp(6, Utils.convertLocalDateTimeToTimeStamp(formatter, comentarioCurso.getDataComentario()));
-                } else {
-                    pstmt.setNull(6, Types.TIMESTAMP);
-                }
+                pstmt.setTimestamp(6, Utils.convertLocalDateTimeToTimeStamp(formatter, comentarioCurso.getDataComentario()));
 
                 if (Utils.objectIsNotNull(comentarioCurso.getDataAprovacao())) {
                     pstmt.setTimestamp(7, Utils.convertLocalDateTimeToTimeStamp(formatter, comentarioCurso.getDataAprovacao()));
@@ -161,12 +196,7 @@ public class ComentarioCursoConverterService {
                 }
 
                 pstmt.setShort(8, (short) 1);
-
-                if (Utils.objectIsNotNull(comentarioCurso.getCursoId())) {
-                    pstmt.setLong(9, comentarioCurso.getCursoId());
-                } else {
-                    pstmt.setNull(9, Types.BIGINT);
-                }
+                pstmt.setLong(9, comentarioCurso.getCursoId());
 
                 if (Utils.objectIsNotNull(comentarioCurso.getModeradorId())) {
                     pstmt.setLong(10, comentarioCurso.getModeradorId());
@@ -174,11 +204,7 @@ public class ComentarioCursoConverterService {
                     pstmt.setNull(10, Types.BIGINT);
                 }
 
-                if (Utils.objectIsNotNull(comentarioCurso.getProfissionalId())) {
-                    pstmt.setLong(11, comentarioCurso.getProfissionalId());
-                } else {
-                    pstmt.setNull(11, Types.BIGINT);
-                }
+                pstmt.setLong(11, comentarioCurso.getProfissionalId());
 
                 pstmt.addBatch();
 

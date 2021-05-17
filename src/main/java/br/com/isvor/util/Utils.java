@@ -3,6 +3,7 @@ package br.com.isvor.util;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 
 public class Utils {
 
@@ -21,8 +22,7 @@ public class Utils {
             return null;
         }
 
-        String dataStr = data.toString().substring(0, data.toString().lastIndexOf(".")).replaceAll("T", " ");
-        return Timestamp.valueOf(LocalDateTime.parse(dataStr, formatter));
+        return Timestamp.valueOf(LocalDateTime.parse(data.toString(), DateTimeFormatter.ISO_LOCAL_DATE_TIME));
     }
 
     public static Integer getIntegerIfNotNull(Integer integer) {
