@@ -1,14 +1,11 @@
 package br.com.isvor.service.mapper;
 
-import br.com.isvor.model.entity.ComentariosItem;
 import br.com.isvor.model.entity.Response;
 import br.com.isvor.model.mapper.ComentarioCurso;
-import br.com.isvor.util.DateUtils;
+import br.com.isvor.util.Utils;
 import org.mapstruct.Mapper;
 import org.mapstruct.factory.Mappers;
 
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -21,15 +18,22 @@ public interface ComentarioCursoMapper {
 
         return response.getComentarios().stream().map(comentarioItem -> {
             ComentarioCurso comentarioCurso = new ComentarioCurso();
-            comentarioCurso.setDescricao(comentarioItem.getDescricao() != null ? comentarioItem.getDescricao() : null);
-            comentarioCurso.setResposta(comentarioItem.getResposta() != null ? comentarioItem.getResposta().toString() : null);
-            comentarioCurso.setStatus(comentarioItem.getStatus() != null ? comentarioItem.getStatus() : null);
-            comentarioCurso.setTipoComentario(comentarioItem.getTipoComentario() != null ? comentarioItem.getTipoComentario() : null);
-            comentarioCurso.setProfissionalId(comentarioItem.getProfissionalId() != null ? comentarioItem.getProfissionalId() : null);
-            comentarioCurso.setCursoId(response.getCursoId() != null ? response.getCursoId() : null);
-            comentarioCurso.setModeradorId(comentarioItem.getProfissionalAprovacaoId() != null ? comentarioItem.getProfissionalAprovacaoId() : null);
-            comentarioCurso.setDataAprovacao(comentarioItem.getDataAprovacao() != null ? DateUtils.convertStringToLocalDateTime(comentarioItem.getDataAprovacao().getDate()) : null);
-            comentarioCurso.setDataComentario(comentarioItem.getDataComentario() != null ? DateUtils.convertStringToLocalDateTime(comentarioItem.getDataComentario().getDate()) : null);
+            comentarioCurso.setDescricao(Utils.getStringIfNotNull(comentarioItem.getDescricao()));
+            comentarioCurso.setResposta(Utils.getStringIfNotNull(comentarioItem.getResposta()));
+            comentarioCurso.setStatus(Utils.getStringIfNotNull(comentarioItem.getStatus()));
+            comentarioCurso.setTipoComentario(Utils.getStringIfNotNull(comentarioItem.getTipoComentario()));
+            comentarioCurso.setProfissionalId(Utils.getIntegerIfNotNull(comentarioItem.getProfissionalId()));
+            comentarioCurso.setCursoId(Utils.getIntegerIfNotNull(response.getCursoId()));
+            comentarioCurso.setModeradorId(Utils.getIntegerIfNotNull(comentarioItem.getProfissionalAprovacaoId()));
+
+            if (comentarioItem.getDataAprovacao() != null) {
+                comentarioCurso.setDataAprovacao(Utils.convertStringToLocalDateTime(comentarioItem.getDataAprovacao().getDate()));
+            }
+
+            if (comentarioItem.getDataComentario() != null) {
+                comentarioCurso.setDataComentario(Utils.convertStringToLocalDateTime(comentarioItem.getDataComentario().getDate()));
+            }
+
             return comentarioCurso;
         }).collect(Collectors.toList());
     }

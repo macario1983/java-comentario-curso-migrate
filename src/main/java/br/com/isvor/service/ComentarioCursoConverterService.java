@@ -5,7 +5,7 @@ import br.com.isvor.model.config.File;
 import br.com.isvor.model.entity.Response;
 import br.com.isvor.model.mapper.ComentarioCurso;
 import br.com.isvor.service.mapper.ComentarioCursoMapper;
-import br.com.isvor.util.DateUtils;
+import br.com.isvor.util.Utils;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -122,17 +122,63 @@ public class ComentarioCursoConverterService {
 
             for (ComentarioCurso comentarioCurso : comentariosCurso) {
 
-                pstmt.setString(1, comentarioCurso.getDescricao());
-                pstmt.setString(2, comentarioCurso.getResposta());
-                pstmt.setString(3, comentarioCurso.getStatus());
-                pstmt.setString(4, comentarioCurso.getTipoComentario());
-                //pstmt.setShort(5, comentarioCurso.get);
-                pstmt.setTimestamp(6, DateUtils.convertLocalDateTimeToTimeStamp(formatter, comentarioCurso.getDataComentario()));
-                pstmt.setTimestamp(7, DateUtils.convertLocalDateTimeToTimeStamp(formatter, comentarioCurso.getDataAprovacao()));
-                //pstmt.setShort(8, comentarioCurso.get);
-                pstmt.setLong(9, comentarioCurso.getCursoId());
-                pstmt.setLong(10, comentarioCurso.getModeradorId());
-                pstmt.setLong(11, comentarioCurso.getProfissionalId());
+                if (Utils.objectIsNotNull(comentarioCurso.getDescricao())) {
+                    pstmt.setString(1, comentarioCurso.getDescricao());
+                } else {
+                    pstmt.setNull(1, Types.VARCHAR);
+                }
+
+                if (Utils.objectIsNotNull(comentarioCurso.getResposta())) {
+                    pstmt.setString(2, comentarioCurso.getResposta());
+                } else {
+                    pstmt.setNull(2, Types.VARCHAR);
+                }
+
+                if (Utils.objectIsNotNull(comentarioCurso.getStatus())) {
+                    pstmt.setString(3, comentarioCurso.getStatus());
+                } else {
+                    pstmt.setNull(3, Types.VARCHAR);
+                }
+
+                if (Utils.objectIsNotNull(comentarioCurso.getTipoComentario())) {
+                    pstmt.setString(4, comentarioCurso.getTipoComentario());
+                } else {
+                    pstmt.setNull(4, Types.VARCHAR);
+                }
+
+                pstmt.setShort(5, (short) 1);
+
+                if (Utils.objectIsNotNull(comentarioCurso.getDataComentario())) {
+                    pstmt.setTimestamp(6, Utils.convertLocalDateTimeToTimeStamp(formatter, comentarioCurso.getDataComentario()));
+                } else {
+                    pstmt.setNull(6, Types.TIMESTAMP);
+                }
+
+                if (Utils.objectIsNotNull(comentarioCurso.getDataAprovacao())) {
+                    pstmt.setTimestamp(7, Utils.convertLocalDateTimeToTimeStamp(formatter, comentarioCurso.getDataAprovacao()));
+                } else {
+                    pstmt.setTimestamp(7, Utils.convertLocalDateTimeToTimeStamp(formatter, LocalDateTime.now()));
+                }
+
+                pstmt.setShort(8, (short) 1);
+
+                if (Utils.objectIsNotNull(comentarioCurso.getCursoId())) {
+                    pstmt.setLong(9, comentarioCurso.getCursoId());
+                } else {
+                    pstmt.setNull(9, Types.BIGINT);
+                }
+
+                if (Utils.objectIsNotNull(comentarioCurso.getModeradorId())) {
+                    pstmt.setLong(10, comentarioCurso.getModeradorId());
+                } else {
+                    pstmt.setNull(10, Types.BIGINT);
+                }
+
+                if (Utils.objectIsNotNull(comentarioCurso.getProfissionalId())) {
+                    pstmt.setLong(11, comentarioCurso.getProfissionalId());
+                } else {
+                    pstmt.setNull(11, Types.BIGINT);
+                }
 
                 pstmt.addBatch();
 
