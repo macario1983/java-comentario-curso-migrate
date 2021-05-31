@@ -11,8 +11,10 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.sql.*;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -26,23 +28,28 @@ public class ComentarioCursoConverterService {
 
     private Properties properties;
     private DbConnectionData dbConnectionData;
-    private File file;
+    private File fileJson;
+    private File fileSql;
+
+    private static final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     public ComentarioCursoConverterService() {
         properties = new Properties();
         dbConnectionData = new DbConnectionData();
-        file = new File();
+        fileJson = new File();
+        fileSql = new File();
     }
 
     public void execute() {
         loadProperties();
-        readJsonFile(file.getPath());
+        readJsonFile(fileJson.getPath());
     }
 
     private void loadProperties() {
         try {
             properties.load(getClass().getClassLoader().getResourceAsStream("config.properties"));
-            file.setPath(properties.get("file.path").toString());
+            fileJson.setPath(properties.get("file.json").toString());
+            fileSql.setPath(properties.get("file.sql").toString());
             dbConnectionData.setUrl(properties.get("db.url").toString());
             dbConnectionData.setPort(properties.get("db.port").toString());
             dbConnectionData.setUser(properties.get("db.user").toString());
@@ -156,101 +163,71 @@ public class ComentarioCursoConverterService {
 
     private void saveComentariosCurso(List<ComentarioCurso> comentariosCurso) {
 
-        PreparedStatement pstmt = null;
-        Connection connection = null;
-
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-        int qtdeTotalRegistrosInseridos = 0;
-
-        String sqlInsert = "INSERT INTO comentario_curso (descricao, resposta, status, tipo_comentario, ativo, data_criacao, data_alteracao, versao, curso_id, moderador_id, profissional_id) " +
-                "VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
-
-        int count = 0;
-        int batchSize = 100;
-
         try {
-            System.out.println("Iniciando procedimento para salvar...");
-            connection = getConnection();
-            connection.setAutoCommit(false);
-            pstmt = connection.prepareStatement(sqlInsert);
+
+            StringBuffer stringBuffer = new StringBuffer();
 
             for (ComentarioCurso comentarioCurso : comentariosCurso) {
 
-                pstmt.setString(1, comentarioCurso.getDescricao());
-                pstmt.setString(2, comentarioCurso.getResposta());
-                pstmt.setString(3, comentarioCurso.getStatus());
+                String sql = String.format("INSERT IGNORE INTO comentario_curso (descricao, resposta, status, tipo_comentario, ativo, data_criacao, data_alteracao, versao, curso_id, moderador_id, profissional_id) " +
+                                "VALUES(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s );",
+                        addQuote(comentarioCurso.getDescricao()),
+                        addQuote(comentarioCurso.getResposta()),
+                        addQuote(comentarioCurso.getStatus()),
+                        getTipoComentario(comentarioCurso),
+                        (short) 1,
+                        addQuote(Utils.convertLocalDateTimeToTimeStamp(formatter, comentarioCurso.getDataComentario()).toString()),
+                        addQuote(getDataAprovacao(comentarioCurso).toString()),
+                        (short) 1,
+                        comentarioCurso.getCursoId(),
+                        getModeradorId(comentarioCurso),
+                        comentarioCurso.getProfissionalId());
 
-                if (Utils.objectIsNotNull(comentarioCurso.getTipoComentario())) {
-                    pstmt.setString(4, comentarioCurso.getTipoComentario());
-                } else {
-                    pstmt.setNull(4, Types.VARCHAR);
-                }
-
-                pstmt.setShort(5, (short) 1);
-                pstmt.setTimestamp(6, Utils.convertLocalDateTimeToTimeStamp(formatter, comentarioCurso.getDataComentario()));
-
-                if (Utils.objectIsNotNull(comentarioCurso.getDataAprovacao())) {
-                    pstmt.setTimestamp(7, Utils.convertLocalDateTimeToTimeStamp(formatter, comentarioCurso.getDataAprovacao()));
-                } else {
-                    pstmt.setTimestamp(7, Utils.convertLocalDateTimeToTimeStamp(formatter, LocalDateTime.now()));
-                }
-
-                pstmt.setShort(8, (short) 1);
-                pstmt.setLong(9, comentarioCurso.getCursoId());
-
-                if (Utils.objectIsNotNull(comentarioCurso.getModeradorId())) {
-                    pstmt.setLong(10, comentarioCurso.getModeradorId());
-                } else {
-                    pstmt.setNull(10, Types.BIGINT);
-                }
-
-                pstmt.setLong(11, comentarioCurso.getProfissionalId());
-
-                pstmt.addBatch();
-
-                count++;
-
-                if (count % batchSize == 0) {
-                    System.out.println("");
-                    System.out.println("Inserindo registros...");
-                    int[] result = pstmt.executeBatch();
-                    System.out.println("Número de registros inseridos: " + result.length);
-                    System.out.println("");
-                    connection.commit();
-
-                    qtdeTotalRegistrosInseridos += result.length;
-                }
+                stringBuffer.append(sql);
+                stringBuffer.append(System.getProperty("line.separator"));
             }
 
-            System.out.println("");
-            System.out.println("Inserindo registros remanecentes...");
-            int[] result = pstmt.executeBatch();
-            System.out.println("Número de registros inseridos: " + result.length);
-            System.out.println("");
-            connection.commit();
+            Files.write(Paths.get(fileSql.getPath()), stringBuffer.toString().getBytes(StandardCharsets.UTF_8), StandardOpenOption.APPEND, StandardOpenOption.CREATE);
 
-            qtdeTotalRegistrosInseridos += result.length;
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
 
-        } catch (SQLException ex) {
-            ex.printStackTrace();
-            try {
-                connection.rollback();
-            } catch (SQLException throwables) {
-                throwables.printStackTrace();
-            }
-        } finally {
-            try {
-                if (pstmt != null) {
-                    pstmt.close();
-                }
-                if (connection != null) {
-                    connection.close();
-                }
-            } catch (Exception ex) {
-                ex.printStackTrace();
-            }
+    private String getTipoComentario(ComentarioCurso comentarioCurso) {
+
+        if (Utils.objectIsNotNull(comentarioCurso.getTipoComentario())) {
+            return addQuote(comentarioCurso.getTipoComentario());
         }
 
+        return null;
+    }
+
+    private Timestamp getDataAprovacao(ComentarioCurso comentarioCurso) {
+
+        if (Utils.objectIsNotNull(comentarioCurso.getDataAprovacao())) {
+            return Utils.convertLocalDateTimeToTimeStamp(formatter, comentarioCurso.getDataAprovacao());
+        }
+
+        return Utils.convertLocalDateTimeToTimeStamp(formatter, LocalDateTime.now());
+    }
+
+    private Integer getModeradorId(ComentarioCurso comentarioCurso) {
+
+        if (Utils.objectIsNotNull(comentarioCurso.getModeradorId())) {
+            return comentarioCurso.getModeradorId();
+        }
+
+        return null;
+    }
+
+    private String addQuote(String value) {
+
+        if (value == null) {
+            return null;
+        }
+
+        return '"' + value.trim() + '"';
     }
 
     private Connection getConnection() throws SQLException {
